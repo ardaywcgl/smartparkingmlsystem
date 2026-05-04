@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark | User Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fa-solid fa-square-p"></i>
+            <span>Smart Parking</span>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="/" class="nav-item active">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/admin" class="nav-item">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Admin</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="status-badge" id="sidebar-global-status">
+                <i class="fa-solid fa-circle"></i>
+                System Online
+            </div>
+            <div class="switch-container">
+                <label class="switch">
+                    <input type="checkbox" id="auto-refresh" checked>
+                    <span class="slider"></span>
+                </label>
+                <span>Auto Refresh</span>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 1.5rem;">v1.2 - Smart Parking ML</p>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <h1 class="page-title">Central Parking</h1>
+            <span id="header-tag" class="status-tag tag-success">Available</span>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fa-solid fa-car-side"></i>
+                    <span>Active Vehicles</span>
+                </div>
+                <div class="stat-value" id="stat-active">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label" style="color: var(--primary);">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Empty Spots</span>
+                </div>
+                <div class="stat-value" id="stat-empty">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span>Capacity</span>
+                </div>
+                <div class="stat-value" id="stat-capacity">100</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fa-solid fa-percent"></i>
+                    <span>Occupancy Rate</span>
+                </div>
+                <div class="stat-value" id="stat-percent">0%</div>
+            </div>
+        </section>
+
+        <section class="progress-container">
+            <div class="progress-header">
+                <span id="progress-text">0 vehicles / 100 capacity</span>
+                <span id="progress-perc-text">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="progress-fill" class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+        </section>
+
+        <div class="content-grid">
+            <div class="left-col">
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-th-large"></i>
+                        Live Parking View
+                    </div>
+                    <div class="parking-grid" id="parking-grid">
+                        <!-- Slots -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-chart-area"></i>
+                        12-Hour Occupancy Forecast
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        Smart Prediction
+                    </div>
+                    <div class="form-group">
+                        <label>Select Time</label>
+                        <input type="datetime-local" id="predict-time">
+                    </div>
+                    <button class="btn btn-primary" onclick="getPrediction()">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                        Predict
+                    </button>
+
+                    <div id="prediction-result" style="margin-top: 2rem; display: none; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <span style="color: var(--text-dim);">Predicted Status</span>
+                            <span id="res-level" class="status-tag">N/A</span>
+                        </div>
+                        <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1.5rem;">
+                            <span id="res-perc" style="font-size: 2.5rem; font-weight: 700;">0%</span>
+                            <span id="res-avail" style="color: var(--text-dim); font-size: 0.9rem;">(~0 empty spots)</span>
+                        </div>
+                        <div id="res-reasons" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+                        
+                        <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 1.5rem; line-height: 1.4;">
+                            <i class="fa-solid fa-circle-info"></i>
+                            Predictions are generated by AI analyzing historical data and event calendars.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let chart;
+        let refreshInterval;
+
+        async function init() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('predict-time').value = now.toISOString().slice(0, 16);
+
+            await updateStatus();
+            await updateForecast();
+            
+            setupRefresh();
+            document.getElementById('auto-refresh').addEventListener('change', setupRefresh);
+        }
+
+        function setupRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            if (document.getElementById('auto-refresh').checked) {
+                refreshInterval = setInterval(updateStatus, 10000);
+            }
+        }
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                const occPerc = (data.current_occupancy / data.capacity) * 100;
+                
+                // Update stats
+                document.getElementById('stat-active').innerText = data.current_occupancy;
+                document.getElementById('stat-empty').innerText = data.capacity - data.current_occupancy;
+                document.getElementById('stat-capacity').innerText = data.capacity;
+                document.getElementById('stat-percent').innerText = `${occPerc.toFixed(1)}%`;
+                
+                // Update progress
+                document.getElementById('progress-text').innerText = `${data.current_occupancy} vehicles / ${data.capacity} capacity`;
+                document.getElementById('progress-perc-text').innerText = `${occPerc.toFixed(1)}%`;
+                document.getElementById('progress-fill').style.width = `${occPerc}%`;
+                
+                // Update tag
+                const tag = document.getElementById('header-tag');
+                if (occPerc < 40) {
+                    tag.innerText = 'Available';
+                    tag.className = 'status-tag tag-success';
+                } else if (occPerc < 80) {
+                    tag.innerText = 'Moderate';
+                    tag.className = 'status-tag tag-warning';
+                } else {
+                    tag.innerText = 'Busy';
+                    tag.className = 'status-tag tag-danger';
+                }
+
+                // Update Grid
+                const grid = document.getElementById('parking-grid');
+                grid.innerHTML = '';
+                data.slots.forEach((isFull, i) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot' + (isFull ? ' full' : '');
+                    slot.title = `Slot ${i + 1}: ${isFull ? 'Full' : 'Empty'}`;
+                    grid.appendChild(slot);
+                });
+
+            } catch (err) {
+                console.error("Status update error:", err);
+            }
+        }
+
+        async function updateForecast() {
+            try {
+                const res = await fetch('/api/forecast');
+                const data = await res.json();
+                
+                const ctx = document.getElementById('forecastChart').getContext('2d');
+                if(chart) chart.destroy();
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.time),
+                        datasets: [{
+                            label: 'Occupancy Rate',
+                            data: data.map(d => (d.occupancy / 100 * 100)), // data occupancy is already scaled to 100 in app.py
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#3b82f6'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { 
+                                beginAtZero: true, 
+                                max: 100, 
+                                ticks: { color: '#94a3b8', callback: v => `${v}%` },
+                                grid: { color: 'rgba(255,255,255,0.05)' } 
+                            },
+                            x: { 
+                                ticks: { color: '#94a3b8' }, 
+                                grid: { display: false } 
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("Forecast error:", err);
+            }
+        }
+
+        async function getPrediction() {
+            const dt = document.getElementById('predict-time').value;
+            const res = await fetch('/api/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({datetime: dt})
+            });
+            const data = await res.json();
+
+            const resultDiv = document.getElementById('prediction-result');
+            resultDiv.style.display = 'block';
+            
+            document.getElementById('res-perc').innerText = `${data.occupancy_percentage}%`;
+            document.getElementById('res-avail').innerText = `(~${Math.floor(data.available_spaces)} empty spots)`;
+            
+            const level = document.getElementById('res-level');
+            level.innerText = data.level;
+            level.className = 'status-tag ' + (data.level === 'Available' ? 'tag-success' : data.level === 'Moderate' ? 'tag-warning' : 'tag-danger');
+
+            const reasons = document.getElementById('res-reasons');
+            reasons.innerHTML = '';
+            data.reasons.forEach(r => {
+                const chip = document.createElement('span');
+                chip.style.cssText = 'background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; color: var(--text-dim); border: 1px solid var(--border);';
+                chip.innerText = r;
+                reasons.appendChild(chip);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark | Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fa-solid fa-square-p"></i>
+            <span>Smart Parking</span>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="/" class="nav-item">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/admin" class="nav-item active">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Admin</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="status-badge" style="background: rgba(245, 158, 11, 0.1); color: var(--accent);">
+                <i class="fa-solid fa-shield-halved"></i>
+                Admin Mode
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 1.5rem;">Logged in as system administrator.</p>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <h1 class="page-title">Admin Panel</h1>
+            <span class="status-tag tag-warning">Live Control</span>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card" style="grid-column: span 2;">
+                <div class="stat-label">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Quick Occupancy Setting</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem;">
+                    <button class="btn" style="width: 80px; background: var(--danger);" onclick="changeOccupancy('dec')">-1</button>
+                    <div id="occ-display" style="font-size: 2.5rem; font-weight: 700;">0 / 100</div>
+                    <button class="btn" style="width: 80px; background: var(--success);" onclick="changeOccupancy('inc')">+1</button>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fa-solid fa-calendar-day"></i>
+                    <span>Active Events</span>
+                </div>
+                <div class="stat-value" id="stat-events">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Last Update</span>
+                </div>
+                <div id="stat-last-sync" style="font-size: 1.2rem; font-weight: 600; margin-top: 1rem;">Just now</div>
+            </div>
+        </section>
+
+        <div class="content-grid">
+            <div class="left-col">
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-square-parking"></i>
+                        Slot Management (Click to Change Status)
+                    </div>
+                    <div class="parking-grid" id="admin-grid">
+                        <!-- Slots -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        Define New Event
+                    </div>
+                    <div class="form-group">
+                        <label>Event Name</label>
+                        <input type="text" id="ev-name" placeholder="Match, Concert, Meeting etc.">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="datetime-local" id="ev-start">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="datetime-local" id="ev-end">
+                    </div>
+                    <div class="form-group">
+                        <label>Extra Vehicle Load (Prediction Impact)</label>
+                        <input type="number" id="ev-extra" value="10">
+                    </div>
+                    <button class="btn btn-primary" onclick="addEvent()">
+                        <i class="fa-solid fa-save"></i>
+                        Save Event
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fa-solid fa-list-check"></i>
+                        Scheduled Events
+                    </div>
+                    <div id="event-list" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <!-- Events -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function init() {
+            await updateUI();
+            setInterval(updateUI, 10000);
+        }
+
+        async function updateUI() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                document.getElementById('occ-display').innerText = `${data.current_occupancy} / ${data.capacity}`;
+                document.getElementById('stat-events').innerText = data.events.length;
+                document.getElementById('stat-last-sync').innerText = new Date().toLocaleTimeString();
+                
+                const grid = document.getElementById('admin-grid');
+                grid.innerHTML = '';
+                data.slots.forEach((isFull, i) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot' + (isFull ? ' full' : '');
+                    slot.innerText = i + 1;
+                    slot.onclick = () => toggleSlot(i);
+                    grid.appendChild(slot);
+                });
+
+                const evList = document.getElementById('event-list');
+                evList.innerHTML = '';
+                if (data.events.length === 0) {
+                    evList.innerHTML = '<p style="color: var(--text-dim); font-size: 0.8rem; text-align: center;">No active events.</p>';
+                }
+                data.events.forEach((ev, i) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;';
+                    div.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                            <h4 style="font-size: 0.9rem;">${ev.name}</h4>
+                            <button onclick="deleteEvent(${i})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem;">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                        <p style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                            ${ev.start.replace('T', ' ')} / ${ev.end.replace('T', ' ')}
+                        </p>
+                        <div class="status-tag tag-warning" style="font-size: 0.6rem;">+${ev.extra_cars} Vehicle Impact</div>
+                    `;
+                    evList.appendChild(div);
+                });
+            } catch (err) {
+                console.error("UI update error:", err);
+            }
+        }
+
+        async function changeOccupancy(action) {
+            await fetch('/api/admin/occupancy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action})
+            });
+            updateUI();
+        }
+
+        async function toggleSlot(index) {
+            await fetch('/api/admin/slot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({index})
+            });
+            updateUI();
+        }
+
+        async function addEvent() {
+            const ev = {
+                name: document.getElementById('ev-name').value,
+                start: document.getElementById('ev-start').value,
+                end: document.getElementById('ev-end').value,
+                extra_cars: parseInt(document.getElementById('ev-extra').value)
+            };
+            if(!ev.name || !ev.start || !ev.end) return alert("Please fill all fields");
+            
+            await fetch('/api/admin/event', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(ev)
+            });
+            updateUI();
+            
+            // Clear inputs
+            document.getElementById('ev-name').value = '';
+            document.getElementById('ev-start').value = '';
+            document.getElementById('ev-end').value = '';
+        }
+
+        async function deleteEvent(index) {
+            if(!confirm("Are you sure you want to delete this event?")) return;
+            await fetch(`/api/admin/event/${index}`, { method: 'DELETE' });
+            updateUI();
+        }
+
+        init();
+    </script>
+</body>
+</html>
